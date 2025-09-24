@@ -6,7 +6,8 @@ After=graphical-session.target
 Requisite=graphical-session.target
 
 [Service]
-ExecStart=/usr/bin/env clipboard-sync --hide-timestamp --log-level debug
+LimitNOFILE=infinity
+ExecStart=/usr/bin/env clipboard-sync --hide-timestamp --log-level warn
 Restart=on-failure
 
 [Install]
