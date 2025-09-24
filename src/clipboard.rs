@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::{env, io::Read, process::Command};
-use terminal_clipboard::Clipboard as TerminalClipboard;
 use wl_clipboard_rs::copy::{MimeType as CopyMimeType, Options, Source};
 use wl_clipboard_rs::paste::{
     get_contents, ClipboardType, Error as PasteError, MimeType as PasteMimeType, Seat,
@@ -152,7 +151,7 @@ impl Clipboard for ArClipboard {
     fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let mut clipboard = arboard::Clipboard::new()?;
-        clipboard.set_text(value.into())?;
+        clipboard.set_text(value)?;
 
         Ok(())
     }
@@ -164,14 +163,14 @@ pub struct X11Clipboard {
 }
 
 #[derive(Clone)]
-pub struct X11Backend(Rc<RefCell<terminal_clipboard::X11Clipboard>>);
+pub struct X11Backend(Rc<RefCell<x11_clipboard::Clipboard>>);
 impl X11Backend {
     /// try to only call this once because repeated initializations may not work.
     /// i started seeing timeouts/errors after 4
     pub fn new(display: &str) -> MyResult<Self> {
-        // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
+        // let backend = stdio! { x11_clipboard::Clipboard::new() }.standardize()?;
         env::set_var("DISPLAY", display);
-        let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
+        let backend = x11_clipboard::Clipboard::new().standardize()?;
 
         Ok(Self(Rc::new(RefCell::new(backend))))
     }
@@ -204,19 +203,28 @@ impl Clipboard for X11Clipboard {
     }
 
     fn get(&self) -> MyResult<String> {
-        Ok(self
-            .backend
-            .0
-            .try_borrow()?
-            .get_string()
-            .unwrap_or_default())
+        let backend = self.backend.0.try_borrow()?;
+        Ok(String::from_utf8(
+            backend
+                .load(
+                    backend.getter.atoms.clipboard,
+                    backend.getter.atoms.utf8_string,
+                    backend.getter.atoms.property,
+                    std::time::Duration::from_secs(2),
+                )
+                .standardize()?,
+        )
+        .unwrap_or_default())
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
-        self.backend
-            .0
-            .try_borrow_mut()?
-            .set_string(value)
+        let backend = self.backend.0.try_borrow_mut()?;
+        backend
+            .store(
+                backend.setter.atoms.clipboard,
+                backend.setter.atoms.utf8_string,
+                value,
+            )
             .standardize()?;
 
         Ok(())

@@ -170,13 +170,14 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
                     clipboards.push(clipboard);
                 }
             }
-            Err(MyError::TerminalClipboard(StandardizedError {
-                inner,
-                stdio: None,
-            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => {
+            Err(MyError::X11Clipboard(StandardizedError { inner, stdio: None }))
+                if matches!(inner, x11_clipboard::error::Error::XcbConnect(_)) =>
+                // experimental yet
+                // if let x11_clipboard::error::Error::XcbConnect(_) = inner =>
+            {
                 xcb_conn_failed_clipboards.push(i);
                 xcb_conn_err = Some(inner);
-            },
+            }
             Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i,
@@ -202,9 +203,8 @@ fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
         display: wl_display.clone(),
     };
     let attempt = clipboard.get();
-    if let Err(MyError::WlcrsPaste(PasteError::WaylandConnection(
-        ConnectError::NoCompositorListening,
-    ))) = attempt
+    if let Err(MyError::WlcrsPaste(PasteError::WaylandConnection(ConnectError::NoCompositor))) =
+        attempt
     {
         return Ok(None);
     }

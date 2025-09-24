@@ -26,7 +26,7 @@ pub enum MyError {
     Io(#[from] std::io::Error),
 
     #[error("{0}")]
-    TerminalClipboard(#[from] StandardizedError<terminal_clipboard::ClipboardError>),
+    X11Clipboard(#[from] StandardizedError<x11_clipboard::error::Error>),
 
     #[error("{0}")]
     Arboard(#[from] arboard::Error),
